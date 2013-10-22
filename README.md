@@ -8,7 +8,6 @@ References
 ----------
 Anne Collard, PhD. thesis,"Geometric statistical processing of brain diffusion tensor images", 2013, http://hdl.handle.net/2268/156140.
 
-
 Contacts:
 --------
 
@@ -38,3 +37,10 @@ The main contribution of this thesis is the development of a novel processing me
 Another contribution of the thesis lies in the development of a statistical method for group comparison. This method uses the notion of similarity measure between the values, a notion that can be defined for multi-valued images, and which enables to reduce the computational cost. The use, for the statistical tests, of the similarity measure associated to our framework turns out to be efficient and informative. 
 
 The study of geometric methods for multi-valued images together with the study of potential applications of diffusion tensor images have enabled the introduction of a novel framework, which is particularly appropriate for those images. The basic operations developed in the thesis open the way to more sophisticated processing algorithms, while ensuring the preservation of the main information associated to the tensors.
+
+DISCLAIMER:
+----------
+This repository content is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free oftware Foundation,  either version 2 of  the License,  or (at  your option) any later version. 
+This code is distributed in the hope  that it will be  useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A  PARTICULAR PURPOSE.  See the  GNU General Public License for more  details.
+A copy of the  GNU General Public License is available in this repository. If not, see <http://www.gnu.org/licenses/>.
+
