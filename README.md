@@ -6,7 +6,9 @@ The repository contains Anne Collard's work on "diffusion tensor imaging". The c
 
 References
 ----------
-Anne Collard, PhD. thesis,"Geometric statistical processing of brain diffusion tensor images", 2013, http://hdl.handle.net/2268/156140.
+Anne Collard, PhD. thesis,"Geometric statistical processing of brain diffusion tensor images", 2013, http://hdl.handle.net/2268/156140.  
+A. Collard, S. Bonnabel, C. Phillips, and R. Sepulchre, "An anisotropy preserving metric for DTI processing", accepted in ‘International Journal of Computer Vision’. http://arxiv.org/abs/1210.2826, DOI: 10.1007/s11263-013-0674-4
+
 
 Contacts:
 --------
