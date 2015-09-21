@@ -37,8 +37,11 @@ classdef difftensor
     %   getHA         - get the HA value(s)
     %   getTensor     - get the tensor(s)
     %   getTr         - get the trace(s)
+    %   get1stEV      - get the 1st eigenvector (main direction)
     %   dist          - distance between 2 tensors, with SQ or LogE metric
-    %   mean          - weighted mean of all array 
+    %   wmean         - weighter mean of all array
+    %   mean          - mean of tensors, column-wise
+    %   std           - standard deviation of distance around mean tensor
     %   rotate        - rotate tensor(s)
     %   rotate_q      - rotate tensor(s) - quaternion representation
     %   scale         - rescale tensor(s)
@@ -51,29 +54,28 @@ classdef difftensor
     % in 
     % 'A. Collard, S.Bonnabel, C. Phillips and R. Sepulchre, 'Anisotropy
     % preserving DTI processing', International Journal of Computer
-    % Vision,2014.
+    % Vision, 2014, 107:58-74.
+	% http://link.springer.com/article/10.1007/s11263-013-0674-4
     % 
     %______________________________________________________________________
-    % Copyright (C) 2011 University of Liege, Belgium
+    % Copyright (C) 2014 University of Liege, Belgium
     
     % Written by A. Collard & C. Phillips, 2014.
-    % Dept of Electrical Engineering and Computer Science &
+    % Department of Electrical Engineering and Computer Science &
     % Cyclotron Research Centre, University of Liege, Belgium
+    % Contact: c.phillips@ulg.ac.be
 
-    
     %% PROPERTIES
     properties
         EigValues   % eigenvalues, sorted in descending order
         Orientation % eigenvectors expressed as a quaternion
         EigVectors  % eigenvectors (this is redundant but more efficient
-%                     for logE calculation)
-        
+                    % for logE calculation)
     end
     
     properties (SetAccess = private)
         HA
         setQ
-        
     end
     
     methods
@@ -81,7 +83,7 @@ classdef difftensor
         function d = difftensor(F,varargin)
             % Allow nargin == 0 syntax
             if nargin ~= 0 && iscell(F)
-                if ndims(F)==2 && length(F)==6
+                if ndims(F)==2 && length(F)==6 %#ok<*ISMAT>
                     % Input as 6 cell arrays with the 6 tensor elements
                     
                     % Handle special cases: different ordering of
@@ -299,8 +301,6 @@ classdef difftensor
                     '[difftensor] Orientation must be given by a unit quaternion.');
             end
             obj.Orientation = value(:);
-           
-
         end
         
         function obj = set.EigVectors(obj,value)
@@ -385,6 +385,21 @@ classdef difftensor
             end
         end
         
+        function EV1 = get1stEV(obj)
+            % Get the 1st eigenvector
+            sz = size(obj);
+            EV1 = zeros([prod(sz),3]);
+            for ii=1:prod(sz)
+                if ~isempty(obj(ii))
+                    EV1(ii,:) = obj(ii).EigVectors(:,1)';
+                end
+            end
+            if prod(sz)>1
+                EV1 = reshape(EV1,[sz 3]);
+            else
+                EV1 = EV1';
+            end
+        end
         
         function dete = getDet(obj)
             % Det get method
@@ -440,19 +455,7 @@ classdef difftensor
                 end
             end
         end
-        
-        function M_ev = maxEV(obj)
-            % Get largest EigValues
-            sz = size(obj);
-            M_ev = zeros(sz);
-            for ii=1:prod(sz)
-                if ~isempty(obj(ii))
-                    M_ev(ii) = obj(ii).EigValues(1);
-                end
-            end
-        end
-        
-        
+               
         %% OBJECT METHODS: apply rotation, affine & scale
         function dr = rotate(d,R)
             % Rotate d by R (3x3 matrix).
@@ -729,9 +732,8 @@ classdef difftensor
             % - if d1=tensor & d2=tensor_array, distance between 1 and all
             %
             % Distance can be computed by "log-Euclidian" metric or
-            % "SQ decomposition". Specified in 3rd argument by
-            % 'SQ' or 'LogE'.
-            % By default, distance is 'SQ'.
+            % "SQ decomposition". Specified in 3rd argument by 'SQ' 
+            % or 'LogE'. By default, distance is 'SQ'.
             
             if nargin<3
                 method = 'SQ';
@@ -780,10 +782,10 @@ classdef difftensor
             end
         end
         
-        function d_mean = mean(di,w,method,rescale)
-            % d_mean = mean(di,w,method,rescale)
+        function d_mean = wmean(di,w,method,rescale)
+            % d_mean = wmean(di,w,method,rescale)
             %
-            % Average between tensors, using the 'SQ' or
+            % Average between all tensors, using the 'SQ' or
             % 'LogE' metric. A weighted mean is possible, depending on the 
             % value of w. If using SQ, rescale enables to modify the
             % weights for the quaternion interpolation.
@@ -793,17 +795,18 @@ classdef difftensor
             % - 'no' : no rescaling is used, weights w are used.
             % - 'HA' : the weights are multiplied by the anisotropy of the
             % tensor (and then normalized).
+            %
+            % By default, 
+            %   w = 1/#tensors, 
+            %   rescale is 'kappa', and
+            %   method is 'SQ'.
             
-            % By default, w = 1/#tensors, rescale is 'kappa' and method is 'SQ'.
-            
-            % Default method
-            
-            if nargin<3
-                rescale = 'kappa';
-                method = 'SQ';
-            end
+            % Default method            
             if nargin<4
                 rescale = 'kappa';
+            end
+            if nargin<3
+                method = 'SQ';
             end
             % Prepare input
             if numel(di)==1
@@ -912,9 +915,106 @@ classdef difftensor
             end
         end
         
+        function d_mean = mean(di,method,rescale,opt)
+            %  d_mean = mean(di,method,rescale,opt)
+            %
+            % Estimate the mean of a 2D array of tensors.
+            % Should have about the same behaviour as the 'mean' operator on an
+            % array of scalar, i.e. column wise mean.
+            % Using the 'SQ'(def.) or 'LogE' metric, as stated by 'method'.
+            % If 'SQ' is used, rescale can be used to modify the weights
+            % associated to the quaternion interpolation (by default, the
+            % rescale is 'kappa').
+            % The mean can be "robust", i.e. only of the non-empty tensors
+            % by setting 'robust' for opt.
+            if nargin<4, opt = 'classic'; end
+            if nargin<3, rescale = 'kappa'; end
+            if nargin<2, method = 'SQ';  end
+            sz = size(di);
+            if length(sz)>2
+                error('[difftensor] Arrays must be 2D at most.');
+            end
+            if all(sz==1)
+                % no avergaing needed
+                d_mean = di;
+            elseif any(sz==1)
+                % simply average all element, row or column.
+                l_nz = ~isempty(di);
+                switch opt
+                    case 'classic'
+                        if all(l_nz)
+                            d_mean = wmean(di(:),1/prod(sz),method,rescale);
+                        else
+                            d_mean = difftensor;
+                        end
+                    case 'robust'
+                        if any(l_nz)
+                            d_mean = wmean(di(l_nz),1/sum(l_nz),method,rescale);
+                        else
+                            d_mean = difftensor;
+                        end
+                    otherwise
+                        error('[difftensor] Wrong options: ''classic'' or ''robust''.');
+                end
+                
+            else
+                d_mean(1,sz(2)) = difftensor;
+                l_nz = ~isempty(di);
+                for ii=1:sz(2)
+                    switch opt
+                        case 'classic'
+                            if all(l_nz(:,ii))
+                                d_mean(ii) = wmean(di(:,ii),1/sz(1),method,rescale);
+                            else
+                                d_mean(ii) = difftensor;
+                            end
+                        case 'robust'
+                            if any(l_nz(:,ii))
+                                d_mean(ii) = wmean(di(l_nz(:,ii),ii),1/sum(l_nz(:,ii)),method,rescale);
+                            else
+                                d_mean(ii) = difftensor;
+                            end
+                        otherwise
+                            error('[difftensor] Arrays must be of the same dimensions.');
+                    end
+                end;
+            end
+        end
+        
+        function s = std(di,method,rescale)
+            % s = std(di,method)
+            %
+            % Estimate the standard deviation (std) of an array of tensors
+            % around its mean.
+            % Should have about the same behviour as the 'std' operator on
+            % an array of scalar, i.e. column wise std.
+            
+            if nargin<3, rescale = 'kappa'; end
+            if nargin<2, method = 'SQ'; end
+            sz = size(di);
+            if length(sz)>2
+                error('[difftensor] Arrays must be 2D at most.');
+            elseif all(sz<3)
+                % no std possible
+                s = [];
+            elseif any(sz==1)
+                % std of all element, row or column.
+                % s = st_dev(di,method);
+                dm = mean(di,method,rescale);
+                D = dist(dm,di,method);
+                s = sqrt(sum(D.^2))/prod(sz);
+            else
+                s = zeros(1,sz(2));
+                for ii=1:sz(2)
+                    % s(ii) = st_dev(di(:,ii),method);
+                    dm = mean(di(:,ii),method);
+                    D = dist(dm,di(:,ii),method);
+                    s(ii) = sqrt(sum(D.^2))/prod(sz);
+                end
+            end
+        end
         
     end
-    
     
 end
 
@@ -1076,27 +1176,27 @@ else
 end
 end
 
-
 function k = calck(HA1,HA2)
 % weighting of eigenvector distance
 d1= size(HA1);
 d2= size(HA2);
 alpha = 0.6;
 if prod(d1)~= prod(d2) && prod(d2) == 1
-k = zeros(prod(d1),1);
-for ii=1 : prod(d1)
-xB = alpha*min(HA1(ii),HA2);
-k(ii) = xB^4/(1+xB^4);
-end
+    k = zeros(prod(d1),1);
+    for ii=1 : prod(d1)
+        xB = alpha*min(HA1(ii),HA2);
+        k(ii) = xB^4/(1+xB^4);
+    end
 
 elseif prod(d1)==prod(d2)
     k = zeros(prod(d1),1);
-for ii=1 : prod(d1)
-xB = alpha*min(HA1(ii),HA2(ii));
-k(ii) = xB^4/(1+xB^4);
-end
+    for ii=1 : prod(d1)
+        xB = alpha*min(HA1(ii),HA2(ii));
+        k(ii) = xB^4/(1+xB^4);
+    end
 
-else error('[difftensor] Problem of dimension to compute k');
+else
+    error('[difftensor] Problem of dimension to compute k');
 end
 end
 
@@ -1105,7 +1205,4 @@ function S = Sexpm(L)
 [v,d] = eig(L);
 S = v*diag(exp(diag(d)))*v';
 end
-
-
-
 
