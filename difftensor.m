@@ -1103,7 +1103,7 @@ classdef difftensor
         end
         
         function d_mean = mean(di,method,rescale,opt)
-            %  d_mean = mean(di,method,opt)
+            %  d_mean = mean(di,method,rescale,opt)
             %
             % Estimate the mean of a 2D array of tensors.
             % Should have about the same behaviour as the 'mean' operator on an
@@ -1114,8 +1114,8 @@ classdef difftensor
             % rescale is 'kappa').
             % The mean can be "robust", i.e. only of the non-empty tensors
             % by setting 'robust' for opt.
-            if nargin <4, opt = 'classic'; end
-            if nargin<3, rescale = 'kappa'; opt = 'classic'; end
+            if nargin<4, opt = 'classic'; end
+            if nargin<3, rescale = 'kappa'; end
             if nargin<2, method = 'SQ';  end
             sz = size(di);
             if length(sz)>2
@@ -1141,7 +1141,7 @@ classdef difftensor
                             d_mean = difftensor;
                         end
                     otherwise
-                        error('[difftensor] Arrays must be of the same dimensions.');
+                        error('[difftensor] Wrong options: ''classic'' or ''robust''.');
                 end
                 
             else
@@ -1167,6 +1167,7 @@ classdef difftensor
                 end;
             end
         end
+
         function [SdQ,k_dist_Q,dist_v] = anal_dist(d1,d2)
 
             % distance according to eigenvalues
@@ -1198,8 +1199,8 @@ classdef difftensor
             % Should have about the same behviour as the 'std' operator on
             % an array of scalar, i.e. column wise std.
             
-            if nargin<2, method = 'SQ'; rescale = 'kappa'; end
-            if nargin <3, rescale = 'kappa'; end
+            if nargin<3, rescale = 'kappa'; end
+            if nargin<2, method = 'SQ'; end
             sz = size(di);
             if length(sz)>2
                 error('[difftensor] Arrays must be 2D at most.');
