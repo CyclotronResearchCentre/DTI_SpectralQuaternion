@@ -94,11 +94,13 @@ classdef difftensor
     % Stuff to check or fix in the code!
     % 1/ Why 2 rotate functions? Should we pool them together? That would  
     % be less confusing/eaiser to use.
+    % -> DONE
     % 2/ Should we include the 'abs' function? -> ensures the eigenvalues 
     % are positive, instead of including this in the building function.
     % REP: probably not a good idea after all but this can be discussed...
     % 3/ Why a getHA that recalculates HA? Couldn't just extract it from the
     % object as it's built in?
+    % -> DONE
 
     %% PROPERTIES
     %%
@@ -1016,26 +1018,6 @@ classdef difftensor
                 for ii=1:sz(2)
                     d_mean(ii) = mean(di(:,ii),method,rescale,opt);
                 end
-%                 l_nz = ~isempty(di);
-%                 for ii=1:sz(2)
-%                     switch opt
-%                         case 'classic'
-%                             if all(l_nz(:,ii))
-%                                 d_mean(ii) = wmean(di(:,ii),1/sz(1),method,rescale);
-%                             else
-%                                 d_mean(ii) = difftensor;
-%                             end
-%                         case 'robust'
-%                             if any(l_nz(:,ii))
-%                                 d_mean(ii) = wmean(di(l_nz(:,ii),ii),1/sum(l_nz(:,ii)),method,rescale);
-%                             else
-%                                 d_mean(ii) = difftensor;
-%                             end
-%                         otherwise
-%                             error('difftensor:mean', ...
-%                                 '[difftensor] Arrays must be of the same dimensions.');
-%                     end
-%                 end;
             end
         end
         
@@ -1068,7 +1050,7 @@ classdef difftensor
                     % s(ii) = st_dev(di(:,ii),method);
                     dm = mean(di(:,ii),method);
                     D = dist(dm,di(:,ii),method);
-                    s(ii) = sqrt(sum(D.^2))/prod(sz);
+                    s(ii) = sqrt(sum(D.^2))/sz(1);
                 end
             end
         end
