@@ -47,9 +47,9 @@ classdef difftensor
     %=========
     %   difftensor    - building of the tensor (array)
     %   getDet        - get determinant(s)
-    %   getFA         - get the FA value(s)
-    %   getRA         - get the RA value(s)
-    %   getHA         - get the HA value(s)
+    %   getFA         - get the FA value(s) -> output with same array size
+    %   getRA         - get the RA value(s) -> output with same array size
+    %   getHA         - get the HA value(s) -> output with same array size
     %   getTensor     - get the rebuilt tensor(s), in a cell array of 
     %                   tensors (use the 'cll' option, Def.) or 'Size x 6'
     %                   array (use the 'img' option).
@@ -101,6 +101,7 @@ classdef difftensor
     % object as it's built in?
 
     %% PROPERTIES
+    %%
     properties
         EigValues   % eigenvalues, sorted in descending order
         Orientation % eigenvectors, expressed as a quaternion
@@ -115,6 +116,8 @@ classdef difftensor
     
     methods
         %% OBJECT DEFINITION: set tensor, eigenvalues & orientation
+        %%
+        
         function d = difftensor(F,varargin)
             % Allow nargin == 0 syntax
             if nargin ~=0 && ~iscell(F)
@@ -494,18 +497,19 @@ classdef difftensor
             end
         end
         
-%         function HA = getHA(obj)
-%             % HA get method
-%             sz = size(obj);
-%             HA = zeros(sz);
-%             for ii=1:prod(sz)
-%                 if ~isempty(obj(ii))
-%                     HA(ii) = calcHA(obj(ii).EigValues);
-%                 end
-%             end
-%         end
+        function HA = getHA(obj)
+            % HA get method
+            sz = size(obj);
+            HA = zeros(sz);
+            for ii=1:prod(sz)
+                if ~isempty(obj(ii))
+                    HA(ii) = obj(ii).HA;
+                end
+            end
+        end
                
         %% OBJECT METHODS: apply rotation, affine & scale
+        %%
 
         function dr = rotate(d,R)
             % Rotate d by rot matrix R (3x3 matrix) or quaternion q (4x1).
@@ -611,6 +615,8 @@ classdef difftensor
         end
         
         %% OBJECT METHODS: display functions (text & plot)
+        %%
+
         function text_display(d)
             % Rebuild the tensor and 'print' it
             for ii=1:numel(d)
@@ -693,10 +699,8 @@ classdef difftensor
             elseif numel(sz)==1
                 sz(2) = 1; sz(3) = 1;
             end
-%             maxHA= max(max(getHA(d)));
-%             minHA= min(min(getHA(d)));
-            maxHA= max(max(d.HA));
-            minHA= min(min(d.HA));
+            maxHA = max(max(getHA(d)));
+            minHA = min(min(getHA(d)));
             figure
             hold on
             for ii=1:sz(1)
@@ -762,6 +766,8 @@ classdef difftensor
         end
         
         %% OBJECT METHODS: distance, (weighted) averaging & std.
+        %%
+
         function di = dist(d1,d2,method)
             % di = dist(d1,d2,method)
             %
@@ -882,8 +888,8 @@ classdef difftensor
                         end
                         Eval_m = exp(E);
                         HAm = calcHA(Eval_m);
-%                         HAi= getHA(di);
-                        HAi= di.HA;
+                        HAi= getHA(di);
+%                         HAi= di.HA;
                         % display(HAi);
                         % k parameters
                         if strcmp(rescale,'kappa')
@@ -940,8 +946,8 @@ classdef difftensor
                         d_mean.Orientation = qm;
                         d_mean.EigVectors = quat2mat(qm);
                           % display(d_mean.HA);
-%                         d_mean.HA = HAm;
-%                         d_mean.setQ = getSetQ(qm);
+                        d_mean.HA = HAm;
+                        d_mean.setQ = getSetQ(qm);
                     
                     case 'LogE'
                         Lt = zeros(3,3);

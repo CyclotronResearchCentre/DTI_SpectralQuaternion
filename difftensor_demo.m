@@ -35,40 +35,32 @@ S(2) = S2;
 
 % t : interpolation parameter
 
-t= 0:0.125:1;
+t = 0:0.125:1;
 
 %% First case : with no rescaling of the orientation interpolation for SQ.
 
 % Comparison of the Log-Euclidean and Spectral-Quaternion interpolation
 
-first_comment = ['The first example will perform an interpolation between 2 tensors,'...
-'using the Log-Euclidean method and the Spectral-Quaternion method'];
-disp(first_comment);
+display('The first example will perform an interpolation between 2 tensors,');
+display('using the Log-Euclidean method and the Spectral-Quaternion method');
 display('with no rescaling of the orientation interpolation.');
-
 display('For each curve, the evolution of the principal features of');
 display('the tensors are also computed and illustrated.');
-
 display('See the file to understand the used commands.');
 
-
-
 % Slog : will contain the Log-Euclidean interpolation
-S_LogE= difftensor;
+S_LogE = difftensor;
 
 % Sspe : will contain the Spectral quaternion interpolation
-S_SQ= difftensor;
+S_SQ = difftensor;
 
 for ii = 1 : length(t)
     w = [(1-t(ii)) t(ii)];
-%     S_LogE(ii) = mean(S,w,'LogE');
-%     S_SQ(ii) = mean(S,w,'SQ','no');
     S_LogE(ii) = wmean(S,w,'LogE');
     S_SQ(ii) = wmean(S,w,'SQ','no');
 end
 
 % Illustration of interpolations
-
 graph_display(S_LogE,0.3);
 title('Log-Euclidean interpolation');
 axis off
@@ -78,47 +70,40 @@ title('Spectral-Quaternion interpolation - no rescaling');
 axis off
 
 % Evolution of the determinant
-
-det_loge= getDet(S_LogE);
-det_spe= getDet(S_SQ);
+det_loge = getDet(S_LogE);
+det_spe = getDet(S_SQ);
 
 % Determine the limits of the y-axis
 minDet = min(min(det_loge),min(det_spe));
 maxDet = max(max(det_loge),max(det_spe));
 
 % Evolution of the Fractional Anisotropy
-
-FA_loge= getFA(S_LogE);
-FA_spe= getFA(S_SQ);
+FA_loge = getFA(S_LogE);
+FA_spe = getFA(S_SQ);
 
 % Determine the limits of the y-axis
 minFA = min(min(FA_loge),min(FA_spe));
 maxFA = max(max(FA_loge),max(FA_spe));
 
-
 % Evolution of the Hilbert Anisotropy
-
-HA_loge= getHA(S_LogE);
-HA_spe= getHA(S_SQ);
+% HA_loge = getHA(S_LogE);
+% HA_spe = getHA(S_SQ);
+HA_loge = [S_LogE.HA];
+HA_spe = [S_SQ.HA];
 
 % Determine the limits of the y-axis
-
 minHA = min(min(HA_loge),min(HA_spe));
 maxHA = max(max(HA_loge),max(HA_spe));
 
 % Evolution of the angular difference between first eigenvectors
-
-phi_loge= zeros(1,length(t));
-
-pv1= S1.EigVectors(:,1);
+phi_loge = zeros(1,length(t));
+pv1 = S1.EigVectors(:,1);
 
 for ii = 1 : length(t)
     pvi= S_LogE(ii).EigVectors(:,1);
     phi_loge(ii)= acos(abs(pv1'*pvi));
 end
-
 phi_spe= zeros(1,length(t));
-
 pv1= S1.EigVectors(:,1);
 for ii = 1 : length(t)
     pvi= S_SQ(ii).EigVectors(:,1);
@@ -126,7 +111,6 @@ for ii = 1 : length(t)
 end
 
 % Determine the limits of the y-axis
-
 minPhi = min(min(phi_loge),min(phi_spe));
 maxPhi = max(max(phi_loge),max(phi_spe));
 
@@ -185,33 +169,28 @@ display('are not impacted.')
 
 
 % Sspe : will contain the Spectral quaternion interpolation
-S_SQ= difftensor;
-
+S_SQ = difftensor;
 for ii = 1 : length(t)
     w = [(1-t(ii)) t(ii)];
-    S_SQ(ii) = mean(S,w,'SQ','kappa');
+    S_SQ(ii) = wmean(S,w,'SQ','kappa');
 end
 
 % Illustration of interpolations
-
 graph_display(S_SQ,0.3);
 title('Spectral-Quaternion interpolation - \kappa rescaling');
 axis off
 
 % Evolution of det, HA, FA are identical than with no rescaling.
-
 % Evolution of the angular difference between first eigenvectors
 
-phi_spe= zeros(1,length(t));
-
-pv1= S1.EigVectors(:,1);
+phi_spe = zeros(1,length(t));
+pv1 = S1.EigVectors(:,1);
 for ii = 1 : length(t)
     pvi= S_SQ(ii).EigVectors(:,1);
     phi_spe(ii)= mod(acos(abs(pv1'*pvi)), 2*pi);
 end
 
 % Determine the limits of the y-axis
-
 minPhi = min(min(phi_loge),min(phi_spe));
 maxPhi = max(max(phi_loge),max(phi_spe));
 
@@ -225,6 +204,7 @@ title('Orientation evolution - Angular difference');
 
 display('Execution paused. Press any key to continue.')
 pause
+
 %% Third case : with 'anisotropic' rescaling 
 display('The third example uses another rescaling of the orientation.');
 display('In this case, the weights are multiplied by the ratio between the');
@@ -236,11 +216,10 @@ display('tensor.');
 
 
 % Sspe : will contain the Spectral quaternion interpolation
-S_SQ= difftensor;
-
+S_SQ = difftensor;
 for ii = 1 : length(t)
     w = [(1-t(ii)) t(ii)];
-    S_SQ(ii) = mean(S,w,'SQ','HA');
+    S_SQ(ii) = wmean(S,w,'SQ','HA');
 end
 
 % Illustration of interpolations
@@ -250,12 +229,9 @@ title('Spectral-Quaternion interpolation - HA rescaling');
 axis off
 
 % Evolution of det, HA, FA are identical than with no rescaling.
-
 % Evolution of the angular difference between first eigenvectors
 
-
 phi_spe= zeros(1,length(t));
-
 pv1= S1.EigVectors(:,1);
 for ii = 1 : length(t)
     pvi= S_SQ(ii).EigVectors(:,1);
@@ -263,7 +239,6 @@ for ii = 1 : length(t)
 end
 
 % Determine the limits of the y-axis
-
 minPhi = min(min(phi_loge),min(phi_spe));
 maxPhi = max(max(phi_loge),max(phi_spe));
 
@@ -277,6 +252,7 @@ title('Orientation evolution - Angular difference');
 
 display('Execution paused. Press any key to continue.');
 pause
+
 %% Interpolations of four tensors
 display('In the first example, the four tensors at the corner of the field');
 display('are averaged to fill the field. The weights are related to the location');
@@ -284,7 +260,6 @@ display('of the tensors. No rescaling is used for the SQ method.');
 
 % Construction of the four corner tensors 
 Sc = difftensor;
-
 Sc(1) = eye(3);
 
 alpha = pi/4;
@@ -299,24 +274,21 @@ alpha = 0;
 R = [cos(alpha) sin(alpha) 0; -sin(alpha) cos(alpha) 0; 0 0 1];
 Sc(4) = R*diag([2 1.9 0.1])*R';
 
-
-
 % Initialization 
 Ssq = difftensor; % will contain the SQ average
 Sloge = difftensor; % will contain the Log-E average
 
 % Fill the array of tensors
-
 for ii = 1 : 10
     for jj = 1:10
         % Computation of the weights (depend upon the location in the
         % array)
-        terme_i= ones(4,1)-[0 0 1 1]'+ ((ii-1)/9)*[-1 -1 1 1]';
-        terme_j= ones(4,1)-[0 1 0 1]'+ ((jj-1)/9)*[-1 1 -1 1]';
-        w= terme_i.*terme_j;
+        terme_i = ones(4,1)-[0 0 1 1]'+ ((ii-1)/9)*[-1 -1 1 1]';
+        terme_j = ones(4,1)-[0 1 0 1]'+ ((jj-1)/9)*[-1 1 -1 1]';
+        w = terme_i.*terme_j;
         
-        Ssq(ii,jj) = mean(Sc,w); % SQ method, no rescaling (default values)
-        Sloge(ii,jj)= mean(Sc,w,'LogE'); % Log-E method
+        Ssq(ii,jj) = wmean(Sc,w); % SQ method, no rescaling (default values)
+        Sloge(ii,jj)= wmean(Sc,w,'LogE'); % Log-E method
     end
 end
 
@@ -342,22 +314,19 @@ view(0,90);
 axis off
 title('Log-Euclidean');
 
-
-
 % Contour maps of the anisotropy
 FA_SQ_no = getFA(Ssq);
 FA_LE = getFA(Sloge);
 
-
 figure
 [C,h] = contour(FA_LE,'linewidth',2);
 clabel(C,h,'FontSize',11);
-title('FA LE');
+title('FA LogE');
 
 figure
 [C,h] = contour(FA_SQ_no,'linewidth',2);
 clabel(C,h,'FontSize',11);
-title('FA SQ- no rescaling');
+title('FA SQ - no rescaling');
 
 display('Execution paused. Press any key to continue.');
 pause
@@ -367,10 +336,10 @@ display('In the second example, the kappa weights are used.');
 Ssq_kappa = difftensor;
 for ii = 1 : 10
     for jj = 1:10
-        terme_i= ones(4,1)-[0 0 1 1]'+ ((ii-1)/9)*[-1 -1 1 1]';
-        terme_j= ones(4,1)-[0 1 0 1]'+ ((jj-1)/9)*[-1 1 -1 1]';
-        w= terme_i.*terme_j;
-        Ssq_kappa(ii,jj) = mean(Sc,w,'SQ','kappa');
+        terme_i = ones(4,1)-[0 0 1 1]'+ ((ii-1)/9)*[-1 -1 1 1]';
+        terme_j = ones(4,1)-[0 1 0 1]'+ ((jj-1)/9)*[-1 1 -1 1]';
+        w = terme_i.*terme_j;
+        Ssq_kappa(ii,jj) = wmean(Sc,w,'SQ','kappa');
     end
 end
 
