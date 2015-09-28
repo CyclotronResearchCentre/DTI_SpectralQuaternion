@@ -390,4 +390,6 @@ size(d_mean)
 d_mean = mean(S3D,3);
 size(d_mean)
 
+graph_display(d_mean,0.4,'Hacol');
+
 end

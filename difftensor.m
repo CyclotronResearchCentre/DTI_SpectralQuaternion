@@ -1016,12 +1016,18 @@ classdef difftensor
             if nargin<3, method = 'SQ';  end
             if nargin<2 || isempty(dim), dim = 0; end % use non-singleton dim
             sz = size(di);
+            if dim==0
+                dim = find(sz>1,1,'first');
+            elseif dim>numel(sz)
+                error('difftensor:mean', ...
+                        '[difftensor] ''dim'' should match array size.');
+            end
             if numel(sz)==1
                 % no avergaing needed
                 d_mean = di;
             elseif numel(sz)==2
                 if any(sz==1)
-                    % simply average all element, row or column.
+                    % simply average all element of vector, row or column.
                     switch opt
                         case 'classic'
                             l_nz = ones(sz);
@@ -1047,21 +1053,18 @@ classdef difftensor
                         end
                     end
                 end
-            else % more than 2D -> check dimensionality or use dim
-                if dim==0
-                    dim = find(sz>1,1,'first');
-                elseif dim>numel(sz)
-                    error('difftensor:mean', ...
-                        '[difftensor] ''dim'' shoudl maw array size.');
-                end
+            else % more than 2D -> use dim
                 s_dim = 1:numel(sz);
                 s_dim(dim) = [];
+                % Reorganize array with permuted dimension and reshape into
+                % 2D array
                 di = reshape(permute(di,[dim s_dim]), ...
                                 [sz(dim) prod(sz(s_dim))]);
                 d_mean(1,prod(sz(s_dim))) = difftensor;
-                for ii=1:sz(dim)
-                    d_mean(ii) = mean(di(ii,:),[],method,rescale,opt);
+                for ii=1:prod(sz(s_dim))
+                    d_mean(ii) = mean(di(:,ii),[],method,rescale,opt);
                 end
+                % Reshape back
                 d_mean = reshape(d_mean,sz(s_dim));
             end
         end
