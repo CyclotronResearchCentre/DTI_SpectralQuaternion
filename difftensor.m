@@ -719,8 +719,9 @@ classdef difftensor
                 sz(2) = 1; sz(3) = 1;
             end
            
-            maxHA = max(max(getHA(d)));
-            minHA = min(min(getHA(d)));
+            tmp_HA = getHA(d);
+            maxHA = max(tmp_HA(:));
+            minHA = min(tmp_HA(:));
             figure
             hold on
             for ii=1:sz(1)
@@ -987,55 +988,81 @@ classdef difftensor
             end
         end
         
-        function d_mean = mean(di,method,rescale,opt)
-            % d_mean = mean(di,method,rescale,opt)
+        function d_mean = mean(di,dim,method,rescale,opt)
+            % d_mean = mean(di,dim,method,rescale,opt)
             %
-            % Estimate the mean of a 2D array of tensors.
+            % Estimate the mean of a N-D array of tensors.
             % Should have about the same behaviour as the 'mean' operator 
-            % on an array of scalar, i.e. column wise mean.
+            % on an array of scalar:
+            % - for a vector, it take the mean of all elements
+            % - for a 2D array, it works column-wise
+            % - for N_D array, it works along the 1st non-singleton dimension
+            % - if 'dim' is specified, then it works along that dimension.
+            % 
             % Using the 'SQ'(def.) or 'LogE' metric, as stated by 'method'.
             % If 'SQ' is used, rescale can be used to modify the weights
             % associated to the quaternion interpolation (by default, the
             % rescale is 'kappa').
             % The mean can be "robust", i.e. only of the non-empty tensors
             % by setting 'robust' for opt.
-            if nargin<4, opt = 'classic'; end
-            if nargin<3, rescale = 'kappa'; end
-            if nargin<2, method = 'SQ';  end
+            %
+            % NOTE: 
+            % 'mean' could be crashing when averaging empty tensors.
+            % Need to include a "try - catch" to return an empty tensor?
+            
+            % Check input
+            if nargin<5, opt = 'classic'; end
+            if nargin<4, rescale = 'kappa'; end
+            if nargin<3, method = 'SQ';  end
+            if nargin<2 || isempty(dim), dim = 0; end % use non-singleton dim
             sz = size(di);
-            if length(sz)>2
-                error('difftensor:mean', ...
-                    '[difftensor] Arrays must be 2D at most.');
-            end
-            if all(sz==1)
+            if numel(sz)==1
                 % no avergaing needed
                 d_mean = di;
-            elseif any(sz==1)
-                % simply average all element, row or column.
-                l_nz = ~isempty(di);
-                switch opt
-                    case 'classic'
-                        if all(l_nz)
-                            d_mean = wmean(di(:),1/prod(sz),method,rescale);
-                        else
-                            d_mean = difftensor;
+            elseif numel(sz)==2
+                if any(sz==1)
+                    % simply average all element, row or column.
+                    switch opt
+                        case 'classic'
+                            l_nz = ones(sz);
+                        case 'robust'
+                            l_nz = ~isempty(di);
+                        otherwise
+                            error('difftensor:mean', ...
+                                '[difftensor] Wrong options: ''classic'' or ''robust''.');
+                    end
+                    d_mean = wmean(di(l_nz),1/sum(l_nz),method,rescale);
+                else
+                    if dim==2
+                        % 2D array proceed per row
+                        d_mean(1,sz(1)) = difftensor;
+                        for ii=1:sz(1)
+                            d_mean(ii) = mean(di(ii,:),[],method,rescale,opt);
                         end
-                    case 'robust'
-                        if any(l_nz)
-                            d_mean = wmean(di(l_nz),1/sum(l_nz),method,rescale);
-                        else
-                            d_mean = difftensor;
+                    else
+                        % 2D array -> proceed per column
+                        d_mean(1,sz(2)) = difftensor;
+                        for ii=1:sz(2)
+                            d_mean(ii) = mean(di(:,ii),[],method,rescale,opt);
                         end
-                    otherwise
-                        error('difftensor:mean', ...
-                            '[difftensor] Wrong options: ''classic'' or ''robust''.');
+                    end
                 end
-                
-            else
-                d_mean(1,sz(2)) = difftensor;
-                for ii=1:sz(2)
-                    d_mean(ii) = mean(di(:,ii),method,rescale,opt);
+            else % more than 2D -> check dimensionality or use dim
+                if dim==0
+                    dim = find(sz>1,1,'first');
+                elseif dim>numel(sz)
+                    error('difftensor:mean', ...
+                        '[difftensor] ''dim'' shoudl maw array size.');
                 end
+                s_dim = 1:numel(sz);
+                s_dim(dim) = [];
+                di = reshape(permute(di,[dim s_dim]), ...
+                                [sz(dim) prod(sz(s_dim))]);
+                d_mean(1,prod(sz(s_dim))) = difftensor;
+                for ii=1:sz(dim)
+                    d_mean(ii) = mean(di(ii,:),[],method,rescale,opt);
+                end
+                d_mean = reshape(d_mean,sz(s_dim));
             end
         end
         

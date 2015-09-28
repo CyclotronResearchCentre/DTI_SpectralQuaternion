@@ -1,8 +1,8 @@
 %% DEMO 1: INTERPOLATION BETWEEN TWO OR FOUR TENSORS
+function difftensor_demo
 
 % This function will show how to compute an interpolating curve between two
 % tensors, and how to interpolate a 2x2 tensor field.
-
 
 % ________________________________________________________
 % Copyright (C) 2013 University of Liege, Belgium
@@ -19,28 +19,26 @@ close all
 %% Interpolations of two tensors
 
 % Construction of the two 'extremities' tensors
-alpha= (1/360)*2*pi;
+alpha = (1/360)*2*pi;
 
-R= [cos(alpha) -sin(alpha) 0; sin(alpha) cos(alpha) 0; 0 0 1];
-S1= difftensor(R*diag([10 1 1])*R');
+R = [cos(alpha) -sin(alpha) 0; sin(alpha) cos(alpha) 0; 0 0 1];
+S1 = difftensor(R*diag([10 1 1])*R');
 
 alpha= (63/360)*2*pi;
 
-R= [cos(alpha) -sin(alpha) 0; sin(alpha) cos(alpha) 0; 0 0 1];
-S2= difftensor(R*diag([40 4 1])*R');
+R = [cos(alpha) -sin(alpha) 0; sin(alpha) cos(alpha) 0; 0 0 1];
+S2 = difftensor(R*diag([40 4 1])*R');
 
 S = difftensor;
 S(1) = S1;
 S(2) = S2;
 
 % t : interpolation parameter
-
 t = 0:0.125:1;
 
 %% First case : with no rescaling of the orientation interpolation for SQ.
 
 % Comparison of the Log-Euclidean and Spectral-Quaternion interpolation
-
 display('The first example will perform an interpolation between 2 tensors,');
 display('using the Log-Euclidean method and the Spectral-Quaternion method');
 display('with no rescaling of the orientation interpolation.');
@@ -74,8 +72,8 @@ det_loge = getDet(S_LogE);
 det_spe = getDet(S_SQ);
 
 % Determine the limits of the y-axis
-minDet = min(min(det_loge),min(det_spe));
-maxDet = max(max(det_loge),max(det_spe));
+% minDet = min(min(det_loge),min(det_spe));
+% maxDet = max(max(det_loge),max(det_spe));
 
 % Evolution of the Fractional Anisotropy
 FA_loge = getFA(S_LogE);
@@ -155,7 +153,6 @@ legend('Log-E','SQ');
 
 display('Execution paused. Press any key to continue.');
 pause;
-
 
 %% Second case : with 'kappa' rescaling 
 display('In the second example, a rescaling of the orientation interpolation');
@@ -279,12 +276,13 @@ Ssq = difftensor; % will contain the SQ average
 Sloge = difftensor; % will contain the Log-E average
 
 % Fill the array of tensors
-for ii = 1 : 10
-    for jj = 1:10
+Ninterp = 10;
+for ii = 1:Ninterp
+    for jj = 1:Ninterp
         % Computation of the weights (depend upon the location in the
         % array)
-        terme_i = ones(4,1)-[0 0 1 1]'+ ((ii-1)/9)*[-1 -1 1 1]';
-        terme_j = ones(4,1)-[0 1 0 1]'+ ((jj-1)/9)*[-1 1 -1 1]';
+        terme_i = ones(4,1)-[0 0 1 1]'+ ((ii-1)/(Ninterp-1))*[-1 -1 1 1]';
+        terme_j = ones(4,1)-[0 1 0 1]'+ ((jj-1)/(Ninterp-1))*[-1 1 -1 1]';
         w = terme_i.*terme_j;
         
         Ssq(ii,jj) = wmean(Sc,w); % SQ method, no rescaling (default values)
@@ -334,10 +332,11 @@ pause
 display('In the second example, the kappa weights are used.');
 
 Ssq_kappa = difftensor;
-for ii = 1 : 10
-    for jj = 1:10
-        terme_i = ones(4,1)-[0 0 1 1]'+ ((ii-1)/9)*[-1 -1 1 1]';
-        terme_j = ones(4,1)-[0 1 0 1]'+ ((jj-1)/9)*[-1 1 -1 1]';
+Ninterp = 10;
+for ii = 1:Ninterp
+    for jj = 1:Ninterp
+        terme_i = ones(4,1)-[0 0 1 1]'+ ((ii-1)/(Ninterp-1))*[-1 -1 1 1]';
+        terme_j = ones(4,1)-[0 1 0 1]'+ ((jj-1)/(Ninterp-1))*[-1 1 -1 1]';
         w = terme_i.*terme_j;
         Ssq_kappa(ii,jj) = wmean(Sc,w,'SQ','kappa');
     end
@@ -377,10 +376,18 @@ view(0,90);
 axis off
 title('Rotation and scaling of each tensor of the preceding field')
 
+%% Test the 3D operators
 
+S3D = cat(3,Ssq_kappa,Snew);
+graph_display(S3D,0.4,'Hacol');
 
+d_mean = mean(S3D,1);
+size(S3D)
+size(d_mean)
+graph_display(d_mean,0.4,'Hacol');
+d_mean = mean(S3D,2);
+size(d_mean)
+d_mean = mean(S3D,3);
+size(d_mean)
 
-
-
-
-
+end
