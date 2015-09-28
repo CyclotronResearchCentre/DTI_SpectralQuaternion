@@ -53,8 +53,9 @@ classdef difftensor
     %   getTensor     - get the rebuilt tensor(s), in a cell array of 
     %                   tensors (use the 'cll' option, Def.) or 'Size x 6'
     %                   array (use the 'img' option).
-    %   get1stEV      - get the 1st eigenvector (main tensor direction), in
+    %   get1stEVec    - get the 1st eigenvector (main tensor direction), in
     %                   a 'Size x 3' array 
+    %   getEVal       - get the eigenvalues, in a 'Size x 3' array 
     %   getTr         - get the trace(s)
     %   dist          - distance between 2 tensors, with SQ or LogE metric
     %   wmean         - weighter mean of all array elements
@@ -439,7 +440,7 @@ classdef difftensor
             end
         end
         
-        function EV1 = get1stEV(obj)
+        function EV1 = get1stEVec(obj)
             % Get the 1st eigenvector
             sz = size(obj);
             EV1 = zeros([prod(sz),3]);
@@ -452,6 +453,22 @@ classdef difftensor
                 EV1 = reshape(EV1,[sz 3]);
             else
                 EV1 = EV1';
+            end
+        end
+        
+        function EVal = getEVal(obj)
+            % Get the eigenvalues
+            sz = size(obj);
+            EVal = zeros([prod(sz),3]);
+            for ii=1:prod(sz)
+                if ~isempty(obj(ii))
+                    EVal(ii,:) = obj(ii).EigValues;
+                end
+            end
+            if prod(sz)>1
+                EVal = reshape(EVal,[sz 3]);
+%             else
+%                 EV1 = EV1';
             end
         end
         
@@ -676,9 +693,12 @@ classdef difftensor
             %
             % Can plot single tensor or array of tensors, up to 3D, as
             % ellipsoids. These can be scaled by a scalar (s).
-            
+            n  = 20;
+            xc = 0; yc = 0; zc = 0;
+            sz = size(d);
             if nargin<2,
-                M_ev = maxEV(d);
+                tmp = getEVal(d);
+                M_ev = max(tmp,[],numel(sz)+1);
                 s = 1/sqrt(max(M_ev(:)));
                 typecol = 'Dircol';
             elseif isempty(s)
@@ -690,9 +710,6 @@ classdef difftensor
                 typecol = 'Dircol';
             end
             
-            n  = 20;
-            xc = 0; yc = 0; zc = 0;
-            sz = size(d);
             if numel(sz)>3,
                 error('difftensor:graph_disp', ...
                     '[difftensor] Can only display up to 3D tensor array');
@@ -701,6 +718,7 @@ classdef difftensor
             elseif numel(sz)==1
                 sz(2) = 1; sz(3) = 1;
             end
+           
             maxHA = max(max(getHA(d)));
             minHA = min(min(getHA(d)));
             figure
@@ -1043,14 +1061,14 @@ classdef difftensor
                 % s = st_dev(di,method);
                 dm = mean(di,method,rescale);
                 D = dist(dm,di,method);
-                s = sqrt(sum(D.^2))/prod(sz);
+                s = sqrt(sum(D.^2))/(prod(sz)-1);
             else
                 s = zeros(1,sz(2));
                 for ii=1:sz(2)
                     % s(ii) = st_dev(di(:,ii),method);
                     dm = mean(di(:,ii),method);
                     D = dist(dm,di(:,ii),method);
-                    s(ii) = sqrt(sum(D.^2))/sz(1);
+                    s(ii) = sqrt(sum(D.^2))/(sz(1)-1);
                 end
             end
         end

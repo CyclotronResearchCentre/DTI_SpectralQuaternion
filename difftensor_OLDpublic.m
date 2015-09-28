@@ -31,6 +31,7 @@ classdef difftensor
     %
     % METHODS:
     %   difftensor    - building of the tensor (array)
+    %   dist          - distance between tensors, SQ or logE
     %   getDet        - get determinant(s)
     %   getFA         - get the FA value(s)
     %   getRA         - get the RA value(s)
@@ -38,44 +39,42 @@ classdef difftensor
     %   getTensor     - get the tensor(s)
     %   getTr         - get the trace(s)
     %   get1stEV      - get the 1st eigenvector (main direction)
+    %   maxEV         - get largest eigen value
+    %   minEV         - get smallest eigen value
     %   dist          - distance between 2 tensors, with SQ or LogE metric
     %   wmean         - weighter mean of all array
     %   mean          - mean of tensors, column-wise
     %   std           - standard deviation of distance around mean tensor
+    %   wmean2dt      - 1D linear interpolation between a pair of tensors
     %   rotate        - rotate tensor(s)
-    %   rotate_q      - rotate tensor(s) - quaternion representation
+    %   affine        - apply affine transformation, with 'preserve
+    %                   principal direction' algorithm
     %   scale         - rescale tensor(s)
     %   text_display  - display as text
     %   graph_display - display graphically (up to 3D arrays)as ellipses
     %   vect_display  - display the main vector, weighted by the FA
     %   isempty       - overloaded function for difftensor
-    %
-    % More information about the SQ methods (distance, mean) are available
-    % in 
-    % 'A. Collard, S.Bonnabel, C. Phillips and R. Sepulchre, 'Anisotropy
-    % preserving DTI processing', International Journal of Computer
-    % Vision, 2014, 107:58-74.
-	% http://link.springer.com/article/10.1007/s11263-013-0674-4
-    % 
     %______________________________________________________________________
-    % Copyright (C) 2014 University of Liege, Belgium
+    % Copyright (C) 2011 University of Liege, Belgium
     
-    % Written by A. Collard & C. Phillips, 2014.
-    % Department of Electrical Engineering and Computer Science &
+    % Written by A. Collard & C. Phillips, 2013.
+    % Dept of Electrical Engineering and Computer Science &
     % Cyclotron Research Centre, University of Liege, Belgium
-    % Contact: c.phillips@ulg.ac.be
 
+    
     %% PROPERTIES
     properties
-        EigValues   % eigenvalues, sorted in descending order
+        EigValues   % eigen values, sorted in descending order
         Orientation % eigenvectors expressed as a quaternion
         EigVectors  % eigenvectors (this is redundant but more efficient
-                    % for logE calculation)
+%                     for logE calculation)
+        
     end
     
     properties (SetAccess = private)
         HA
         setQ
+        
     end
     
     methods
@@ -83,7 +82,7 @@ classdef difftensor
         function d = difftensor(F,varargin)
             % Allow nargin == 0 syntax
             if nargin ~= 0 && iscell(F)
-                if ndims(F)==2 && length(F)==6 %#ok<*ISMAT>
+                if ndims(F)==2 && length(F)==6
                     % Input as 6 cell arrays with the 6 tensor elements
                     
                     % Handle special cases: different ordering of
@@ -301,6 +300,7 @@ classdef difftensor
                     '[difftensor] Orientation must be given by a unit quaternion.');
             end
             obj.Orientation = value(:);
+
         end
         
         function obj = set.EigVectors(obj,value)
@@ -455,7 +455,29 @@ classdef difftensor
                 end
             end
         end
-               
+        
+        function M_ev = maxEV(obj)
+            % Get largest EigValues
+            sz = size(obj);
+            M_ev = zeros(sz);
+            for ii=1:prod(sz)
+                if ~isempty(obj(ii))
+                    M_ev(ii) = obj(ii).EigValues(1);
+                end
+            end
+        end
+        
+        function m_ev = minEV(obj)
+            % Get smallest EigValues
+            sz = size(obj);
+            m_ev = zeros(sz);
+            for ii=1:prod(sz)
+                if ~isempty(obj(ii))
+                    m_ev(ii) = obj(ii).EigValues(3);
+                end
+            end
+        end
+        
         %% OBJECT METHODS: apply rotation, affine & scale
         function dr = rotate(d,R)
             % Rotate d by R (3x3 matrix).
@@ -471,7 +493,12 @@ classdef difftensor
                         error('[difftensor] R must be a rotation matrix');
                     end
                     qR = mat2quat(R{ii});
-                    dr(ii) = rotate_q(d(ii),qR);
+                    QR = [qR -qR];
+                    qR_R = realignQ(d(ii).Orientation,QR);
+                    qnew = multiplication(qR_R,d(ii).Orientation);
+                    dr(ii).Orientation = qnew;
+                    dr(ii).setQ = getSetQ(qnew);
+                    dr(ii).EigVectors = quat2mat(qnew);
                 end
             elseif isnumeric(R)
                 % apply same rotation matrix to all tensors
@@ -480,7 +507,17 @@ classdef difftensor
                     error('[difftensor] R must be a rotation matrix');
                 end
                 qR = mat2quat(R);
-                dr = rotate_q(d,qR);
+                QR = [qR -qR];
+                for ii=1:numel(d)
+                    if ~isempty(d(ii))
+                        qR_R = realignQ(d(ii).Orientation,QR);
+                        qnew = multiplication(qR_R,d(ii).Orientation);
+                        dr(ii).Orientation = qnew;
+                        dr(ii).setQ = getSetQ(qnew);
+                        dr(ii).EigVectors = quat2mat(qnew);
+                        
+                    end
+                end
             else
                 error('[difftensor] Invalid rotation operation.');
             end
@@ -503,7 +540,6 @@ classdef difftensor
                     qR_R = realignQ(d(ii).Orientation,QR);
                     qnew = multiplication(qR_R,d(ii).Orientation);
                     dr(ii).Orientation = qnew;
-                    dr(ii).EigVectors = quat2mat(qnew);
                 end
             elseif isnumeric(qR)
                 % apply same rotation matrix to all tensors
@@ -515,18 +551,146 @@ classdef difftensor
                     qR_R = realignQ(d(ii).Orientation,QR);
                     qnew = multiplication(qR_R,d(ii).Orientation);
                     dr(ii).Orientation = qnew;
-                    dr(ii).EigVectors = quat2mat(qnew);
                 end
             else
                 error('[difftensor] Invalid rotation operation.');
             end
         end
-       
+        
+        function da = affine(d,F)
+            % Tensor d and affine transformation F (3x3 mtrix)
+            % The rotation associated with the 'deformation part' F
+            % of an affine transform (i.e. without the translation
+            % component) is estimated in order to "preserve the principal
+            % direction" (PPD) of tensor d.
+            %
+            % The rotation matrix R so derived depends on F but also on the
+            % eigenvectors EV of the tensor that is transformed!
+            % Reference:
+            % D.C. Alexander, C. Pierpoli, P.J. Basser and J.C. Gee,
+            % Spatial Transformations of Diffusion Tensor Magnetic
+            % Resonance Images, IEEE Transactions on Medical Imaging,
+            % 20(11):1131-1139.
+            
+            EV = d.EigVectors;
+            n1 = F*EV(:,1); n1 = n1/norm(n1);
+            n2 = F*EV(:,2); n2 = n2/norm(n2);
+            
+            % 1st rotation
+            r1 = vectprod(EV(:,1),n1); r1 = r1/norm(r1);
+            theta1 = acos(EV(:,1)'*n1);
+            R1 = buildrot(r1,theta1);
+            
+            % 2nd rotation
+            Pn2 = n2 - (n2'*n1)*n1;
+            theta2 = acos((R1*EV(:,2))' * (Pn2/norm(Pn2)));
+            r2 = R1*EV(:,1);
+            R2 = buildrot(r2,theta2);
+            
+            % combine the 2 rotations & apply
+            R = real(R1*R2);
+            da = rotate(d,R);
+        end
+        
+        function d_trans= rigid_warp(d,M,t,method,rescale)
+            % Apply a (rigid) spatial transformation to a difftensor field
+            % !! Limited to 3D images
+
+            % d: difftensor field
+            % M: linear transformation matrix (3x3)
+            % t: rigid translation (3x1)
+            
+            % method can be 'SQ' or 'LogE'. If the used method is SQ,
+            % rescale can be used to modify the weights associated to the
+            % quaternion interpolation.
+
+            % 'Linear' interpolation method
+            if nargin<5
+                rescale = 'kappa';
+            end
+            if nargin<4
+                method = 'SQ';
+                rescale = 'kappa';
+            end
+            ds= size(d);
+            if length(ds)>3
+                error('[difftensor] Spatial transform are restricted to 3D fields.');
+            end
+
+
+            % "zero" difftensor
+
+            F= difftensor(0.005*eye(3));
+            R= (M*M')^(-1/2)*M;
+            d_trans= difftensor;
+            l= ds(1);
+            lm = ceil(l/2);
+            m= ds(2);
+            mm = ceil(m/2);
+            if length(ds)<3
+                h=1;
+            else
+                h = ds(3);
+            end
+
+            for ii=1:l
+                for jj=1:m
+                    for kk=1:h
+                        x= [ii-lm,jj-mm,kk]';
+                        M1x= M*x;
+                        Mtx= M1x+t;
+
+                        % rotation autour du milieu
+                        Mtx = Mtx+ [lm mm 0]';
+
+                        % Calcul de f(M1x) par interpolation
+                    i1= floor(Mtx(1)); i2= ceil(Mtx(1));
+
+                    j1= floor(Mtx(2)); j2= ceil(Mtx(2));
+
+                    k1= floor(Mtx(3)); k2= ceil(Mtx(3));
+
+                    if i1<=0 ||i2> l|| j1<=0 ||j2> m || k1<=0 || k2>h % ext�rieur
+                        d_trans(ii,jj,kk)=F;
+                    elseif Mtx(1)>=1 && Mtx(1)<=l && Mtx(2)>=1 && Mtx(2)<=m && Mtx(3)>=1 && Mtx(3)<=h %int�rieur
+                    ind_i= [i1 i1 i2 i2 i1 i1 i2 i2]';
+                    ind_j= [j1 j2 j1 j2 j1 j2 j1 j2]';
+                    ind_k= [k1 k1 k1 k1 k2 k2 k2 k2]';
+
+                    ind= (ind_k-ones(8,1))*m*l+ (ind_j-ones(8,1))*l+ ind_i;
+
+
+                    L= d(ind);
+
+
+                    xx= Mtx(1)-i1;
+                    yy= Mtx(2)-j1;
+                    zz= Mtx(3)-k1;
+                    terme_i= ones(8,1)-[0 0 1 1 0 0 1 1]'+ xx*[-1 -1 1 1 -1 -1 1 1]';
+                    terme_j= ones(8,1)-[0 1 0 1 0 1 0 1]'+ yy*[-1 1 -1 1 -1 1 -1 1]';
+                    terme_k= ones(8,1)-[0 0 0 0 1 1 1 1]'+ zz*[-1 -1 -1 -1 1 1 1 1]';
+
+                    w= terme_i.*terme_j.*terme_k;
+
+                    WA = wmean(L,w,method,rescale);
+            %         d_trans(ii,jj,kk)= affine(WA,M);
+                    d_trans(ii,jj,kk) = rotate(WA,R);
+            %           d_trans(ii,jj,kk)= WA;
+                    end
+
+
+                    end
+                end
+            end
+        
+        end
+
+        
         function ds = scale(d,S)
             % Scale d by S
             % - if S is a cell-array of scaling (3x1) vectors and d is a
             %   difftensor array of the same size as S
-            %       -> apply scaling eigenvalue by eigenvalue and element
+            %       -> apply scaling eignvalue by eigenvalue and element
             %          by element
             % - if S is a scalar-array of scaling factor and d is a
             %   diftensor array of the same size as S
@@ -607,9 +771,9 @@ classdef difftensor
                         if ~isempty(d(ii,jj,kk))
                             v = d(ii,jj,kk).EigVectors(:,1);
                             vw = v*getFA(d(ii,jj,kk))/2;
-                            x = (jj-1);
-                            y = (ii-1);
-                            z = (kk-1);
+                            x = 1*(jj-1);
+                            y = 1*(ii-1);
+                            z = 1*(kk-1);
                             plot3([x+vw(1) x-vw(1)]',[y+vw(2) y-vw(2)]',...
                                 [z+vw(3) z-vw(3)],'Color',abs(v)','LineWidth',2)
                             plot3(x,y,z,'ko')
@@ -671,10 +835,6 @@ classdef difftensor
                             
                             % Transformer V
                             Q = d(ii,jj,kk).EigVectors;
-                            if isempty(Q)
-                                q = d(ii,jj,kk).Orientation;
-                                Q = quat2mat(q);
-                            end
                             if isnan(Q)
                                 display(ii);
                                 display(jj);
@@ -732,8 +892,9 @@ classdef difftensor
             % - if d1=tensor & d2=tensor_array, distance between 1 and all
             %
             % Distance can be computed by "log-Euclidian" metric or
-            % "SQ decomposition". Specified in 3rd argument by 'SQ' 
-            % or 'LogE'. By default, distance is 'SQ'.
+            % "SQ decomposition". Specified in 3rd argument by
+            % 'SQ' or 'LogE'.
+            % By default, distance is 'SQ'.
             
             if nargin<3
                 method = 'SQ';
@@ -782,31 +943,27 @@ classdef difftensor
             end
         end
         
+        function [k,dist_Q,rQ] = calc_grad_q(d1,d2)
+            
+                [k,dist_Q,rQ] = grad_q(d1,d2);
+                
+        end
+        
         function d_mean = wmean(di,w,method,rescale)
             % d_mean = wmean(di,w,method,rescale)
             %
-            % Average between all tensors, using the 'SQ' or
-            % 'LogE' metric. A weighted mean is possible, depending on the 
-            % value of w. If using SQ, rescale enables to modify the
+            % Weighted average between tensors, using the 'SQ' or
+            % 'LogE' metric. If using SQ, rescale enables to modify the
             % weights for the quaternion interpolation.
-            % - 'kappa' : the weights are computed following Eq. (40) of 
-            % A. Collard, S. Bonnabel, C. Phillips and R. Sepulchre,
-            % 'Anisotropy preserving DTI processing'.
-            % - 'no' : no rescaling is used, weights w are used.
-            % - 'HA' : the weights are multiplied by the anisotropy of the
-            % tensor (and then normalized).
-            %
-            % By default, 
-            %   w = 1/#tensors, 
-            %   rescale is 'kappa', and
-            %   method is 'SQ'.
+            % By default weighting is 'kappa' and method is 'SQ'.
             
-            % Default method            
+            % Default method
+            if nargin<3
+                rescale = 'kappa';
+                method = 'SQ';
+            end
             if nargin<4
                 rescale = 'kappa';
-            end
-            if nargin<3
-                method = 'SQ';
             end
             % Prepare input
             if numel(di)==1
@@ -872,9 +1029,6 @@ classdef difftensor
                     for ii=1:num_dt
                         if ii~=Iwmax
                             Q2  = di(ii).setQ;
-                            if isempty(Q2)
-                                Q2 = getSetQ(di(ii).Orientation);
-                            end
                             q2n = realignQ(qr,Q2);
                             qm  = qm + kw(ii)*q2n/sk;
                         end
@@ -893,17 +1047,13 @@ classdef difftensor
                     d_mean.EigValues = Eval_m;
                     d_mean.Orientation = qm;
                     d_mean.EigVectors = quat2mat(qm);
-                   % display(d_mean.HA);
-%                     d_mean.HA = HAm;
-%                     d_mean.setQ = getSetQ(qm);
+                    d_mean.HA = HAm;
+                    d_mean.setQ = getSetQ(qm);
                     
                 case 'LogE'
                     Lt = zeros(3,3);
                     for ii=1:num_dt
                         R = di(ii).EigVectors;
-                        if isempty(R)
-                            R = quat2mat(di(ii).Orientation);
-                        end
                         Ln = R*diag(log(di(ii).EigValues))*R';
                         Lt = Lt + w(ii)*Ln;
                     end
@@ -912,6 +1062,43 @@ classdef difftensor
                 otherwise
                     error('[difftensor] Unknow tensor metric');
             end
+            end
+        end
+        
+        function d_mean = wmean2dt(d1,d2,t,method,rescale)
+            % d_mean = wmean2dt(d1,d2,t,method,rescale)
+            %
+            % Linear interpolation between 2 (arrays of) tensors.
+            % The parameter 't' belongs to [0 1].
+            % By default t = .5
+            % Using the 'SQ' or 'LogE' metric, as defined by 'method'.
+            % If SQ is used, rescale enables to modify the weight of the
+            % quaternion interpolation. Default rescale is kappa.
+            
+            if nargin<4, method = 'SQ'; rescale = 'kappa'; end
+            if nargin<5, rescale = 'kappa'; end
+            if nargin<3,
+                t = .5;
+            else
+                if t>1 || t<0
+                    error('[difftensor] Weight ''t'' should be [0 1].');
+                end
+            end
+            if numel(d1)==1 && numel(d2)==1
+                dm = difftensor;
+                dm(1) = d1;
+                dm(2) = d2;
+                d_mean = wmean(dm,[(1-t) t]',method,rescale);
+            elseif numel(d1)==numel(d2)
+                d_mean = d1;
+                for ii=1:numel(d1)
+                    dm = difftensor;
+                    dm(1)= d1(ii);
+                    dm(2)= d2(ii);
+                    d_mean(ii)= wmean(dm,[(1-t) t]',method,rescale);
+                end
+            else
+                error('[difftensor] Arrays must be of the same dimensions.');
             end
         end
         
@@ -980,7 +1167,30 @@ classdef difftensor
                 end;
             end
         end
-        
+
+        function [SdQ,k_dist_Q,dist_v] = anal_dist(d1,d2)
+
+            % distance according to eigenvalues
+            L1 = log(d1.EigValues);
+            L2 = log(d2.EigValues);
+            dist_v = sum((L2-L1).^2);
+            % distance accroding to orientation, depending on k
+            k = calck(d1.HA,d2.HA);
+            if k<1e-4
+                % no angular information
+                SdQ = sqrt(dist_v);
+            else
+                % with angular information
+                d2.setQ = getSetQ(d2.Orientation);
+                dist_Q = realignD(d1.Orientation,d2.setQ);
+                if dist_Q <1e-4
+                    dist_Q = 0;
+                end
+                SdQ = k*sqrt(dist_Q) + sqrt(dist_v);
+                k_dist_Q = k*sqrt(dist_Q);
+                dist_v = sqrt(dist_v);
+            end
+            end
         function s = std(di,method,rescale)
             % s = std(di,method)
             %
@@ -1015,6 +1225,7 @@ classdef difftensor
         end
         
     end
+    
     
 end
 
@@ -1137,16 +1348,7 @@ end
 function dLE = dist_LE(d1,d2)
 % calculate Log-Euclidian distance between 2 tensors
 R1 = d1.EigVectors;
-if isempty(R1)
-    v = d1.Orientation;
-    R1 = quat2mat(v);
-end
-
 R2 = d2.EigVectors;
-if isempty(R2)
-    v = d2.Orientation;
-    R2 = quat2mat(v);
-end
 L1 = R1*diag(log(d1.EigValues))*R1';
 L2 = R2*diag(log(d2.EigValues))*R2';
 A  = L1 - L2;
@@ -1161,7 +1363,7 @@ L1 = log(d1.EigValues);
 L2 = log(d2.EigValues);
 dist_v = sum((L2-L1).^2);
 % distance accroding to orientation, depending on k
-k = calck(getHA(d1),getHA(d2));
+k = calck(d1.HA,d2.HA);
 if k<1e-4
     % no angular information
     SdQ = sqrt(dist_v);
@@ -1176,27 +1378,36 @@ else
 end
 end
 
+function [k,dist_Q,rq] = grad_q(d1,d2)
+% k
+k = calck(d1.HA,d2.HA);
+% distance accroding to orientation
+dist_Q = realignD(d1.Orientation,d2.setQ);
+% realigned quaternion
+rq = realignQ(d1.Orientation,d2.setQ);
+    
+end
+
 function k = calck(HA1,HA2)
 % weighting of eigenvector distance
 d1= size(HA1);
 d2= size(HA2);
 alpha = 0.6;
 if prod(d1)~= prod(d2) && prod(d2) == 1
-    k = zeros(prod(d1),1);
-    for ii=1 : prod(d1)
-        xB = alpha*min(HA1(ii),HA2);
-        k(ii) = xB^4/(1+xB^4);
-    end
+k = zeros(prod(d1),1);
+for ii=1 : prod(d1)
+xB = alpha*min(HA1(ii),HA2);
+k(ii) = xB^4/(1+xB^4);
+end
 
 elseif prod(d1)==prod(d2)
     k = zeros(prod(d1),1);
-    for ii=1 : prod(d1)
-        xB = alpha*min(HA1(ii),HA2(ii));
-        k(ii) = xB^4/(1+xB^4);
-    end
+for ii=1 : prod(d1)
+xB = alpha*min(HA1(ii),HA2(ii));
+k(ii) = xB^4/(1+xB^4);
+end
 
-else
-    error('[difftensor] Problem of dimension to compute k');
+else error('[difftensor] Problem of dimension to compute k');
 end
 end
 
@@ -1204,5 +1415,30 @@ function S = Sexpm(L)
 % matrix exponential
 [v,d] = eig(L);
 S = v*diag(exp(diag(d)))*v';
+end
+
+% function Re = Rexpm(G)
+% % G must be anti-symmetric
+% g = [G(3,2) G(1,3) G(2,1)]';
+% w = g/norm(G);
+% what = [0 -w(3) w(2); w(3) 0 -w(1);-w(2) w(1) 0];
+% theta = G(1,2)/what(1,2);
+% Re = eye(3)+ what*sin(theta)+ what^2*(1-cos(theta));
+% end
+
+function c = vectprod(a,b)
+% vectorial product of 2 vectors
+% http://en.wikipedia.org/wiki/Cross_product#Coordinate_notation
+c = [...
+    a(2)*b(3)-a(3)*b(2) ; ...
+    a(3)*b(1)-a(1)*b(3) ; ...
+    a(1)*b(2)-a(2)*b(1) ];
+end
+
+function Ro = buildrot(r,theta)
+% build rotation matricx from axis and angle
+% http://en.wikipedia.org/wiki/Rotation_matrix#Rotation_matrix_from_axis_and_angle
+tmp = [0 -r(3) r(2) ; r(3) 0 -r(1) ; -r(2) r(1) 0];
+Ro = eye(3)*cos(theta) + sin(theta)*tmp + (1-cos(theta)) * (r*r');
 end
 
