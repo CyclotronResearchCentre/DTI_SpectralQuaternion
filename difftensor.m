@@ -467,8 +467,6 @@ classdef difftensor
             end
             if prod(sz)>1
                 EVal = reshape(EVal,[sz 3]);
-%             else
-%                 EV1 = EV1';
             end
         end
         
@@ -852,7 +850,8 @@ classdef difftensor
         function d_mean = wmean(di,w,method,rescale)
             % d_mean = wmean(di,w,method,rescale)
             %
-            % Average between all tensors, using the 'SQ' or 'LogE' metric.
+            % Average between *all* tensors in array 'di', using the 'SQ' 
+            % or 'LogE' metric.
             % A weighted mean is possible, depending on the value of w.
             % If using SQ, rescale enables to modify the weights for the 
             % quaternion interpolation.
@@ -868,12 +867,8 @@ classdef difftensor
             % - method is 'SQ'.
             
             % Default method            
-            if nargin<4
-                rescale = 'kappa';
-            end
-            if nargin<3
-                method = 'SQ';
-            end
+            if nargin<4, rescale = 'kappa'; end
+            if nargin<3, method = 'SQ'; end
             % Prepare input
             if numel(di)==1
                 d_mean = di;
@@ -910,7 +905,6 @@ classdef difftensor
                         Eval_m = exp(E);
                         HAm = calcHA(Eval_m);
                         HAi= getHA(di);
-%                         HAi= di.HA;
                         % display(HAi);
                         % k parameters
                         if strcmp(rescale,'kappa')
@@ -1025,35 +1019,19 @@ classdef difftensor
             if numel(sz)==1
                 % no avergaing needed
                 d_mean = di;
-            elseif numel(sz)==2
-                if any(sz==1)
-                    % simply average all element of vector, row or column.
-                    switch opt
-                        case 'classic'
-                            l_nz = ones(sz);
-                        case 'robust'
-                            l_nz = ~isempty(di);
-                        otherwise
-                            error('difftensor:mean', ...
-                                '[difftensor] Wrong options: ''classic'' or ''robust''.');
-                    end
-                    d_mean = wmean(di(l_nz),1/sum(l_nz),method,rescale);
-                else
-                    if dim==2
-                        % 2D array proceed per row
-                        d_mean(1,sz(1)) = difftensor;
-                        for ii=1:sz(1)
-                            d_mean(ii) = mean(di(ii,:),[],method,rescale,opt);
-                        end
-                    else
-                        % 2D array -> proceed per column
-                        d_mean(1,sz(2)) = difftensor;
-                        for ii=1:sz(2)
-                            d_mean(ii) = mean(di(:,ii),[],method,rescale,opt);
-                        end
-                    end
+            elseif numel(sz)==2 && any(sz==1)
+                % simply average all element of vector
+                switch opt
+                    case 'classic'
+                        l_nz = ones(sz);
+                    case 'robust'
+                        l_nz = ~isempty(di);
+                    otherwise
+                        error('difftensor:mean', ...
+                            '[difftensor] Wrong options: ''classic'' or ''robust''.');
                 end
-            else % more than 2D -> use dim
+                d_mean = wmean(di(l_nz),1/sum(l_nz),method,rescale);
+            else % N-D array -> use dim
                 s_dim = 1:numel(sz);
                 s_dim(dim) = [];
                 % Reorganize array with permuted dimension and reshape into
@@ -1069,43 +1047,64 @@ classdef difftensor
             end
         end
         
-        function s = std(di,method,rescale)
-            % s = std(di,method,rescale)
+        function s = std(di,flag,dim,method,rescale)
+            % s = std(di,flag,dim,method,rescale)
             %
             % Estimate the standard deviation (std) of an array of tensors
             % around its mean.
             % Should have about the same behviour as the 'std' operator on
-            % an array of scalar, i.e. column wise std.
+            % an array of scalar:
+            % - for a vector, returns the std
+            % - for a 2D array, works column wise
+            % - for a N-D array, works along the 1st non-singleton dimension
+            % 
+            % 'std' normalizes by (N-1), with N the sample size. If 'flag'
+            % is set to 1/true, then 'std' normalizes by N.
+            % If 'dim' is set, then 'std' works along the dimension 'dim'.
             
-            if nargin<3, rescale = 'kappa'; end
-            if nargin<2, method = 'SQ'; end
+            if nargin<5, rescale = 'kappa'; end
+            if nargin<4, method = 'SQ'; end
+            if nargin<2 || isempty(dim), dim = 0; end % use non-singleton dim
             sz = size(di);
-            if length(sz)>2
-                error('difftensor:std', ...
-                    '[difftensor] Arrays must be 2D at most.');
-            elseif all(sz<3)
-                % no std possible
-                s = [];
-            elseif any(sz==1)
-                % std of all element, row or column.
-                % s = st_dev(di,method);
+            if dim==0
+                dim = find(sz>1,1,'first');
+            elseif dim>numel(sz)
+                error('difftensor:mean', ...
+                        '[difftensor] ''dim'' should match array size.');
+            end
+            % set scaling to (N-1) or N
+            if flag
+                sc = sz(dim);
+            else
+                sc = sz(dim)-1;
+            end
+            if numel(sz)==1
+                % no calculation needed
+                s = 0;
+            elseif numel(sz)==2 || any(sz==1)
+                % simply vector case
                 dm = mean(di,method,rescale);
                 D = dist(dm,di,method);
-                s = sqrt(sum(D.^2))/(prod(sz)-1);
-            else
-                s = zeros(1,sz(2));
-                for ii=1:sz(2)
-                    % s(ii) = st_dev(di(:,ii),method);
-                    dm = mean(di(:,ii),method);
-                    D = dist(dm,di(:,ii),method);
-                    s(ii) = sqrt(sum(D.^2))/(sz(1)-1);
+                s = sqrt(sum(D.^2)/sc);
+            else % N-D array -> use dim
+                s_dim = 1:numel(sz);
+                s_dim(dim) = [];
+                % Reorganize array with permuted dimension and reshape into
+                % 2D array
+                di = reshape(permute(di,[dim s_dim]), ...
+                                [sz(dim) prod(sz(s_dim))]);
+                s = zeros(1,prod(sz(s_dim)));
+                for ii=1:prod(sz(s_dim))
+                    s(ii) = std(di(:,ii),flag,[],method,rescale);
                 end
+                % Reshape back
+                s = reshape(s,sz(s_dim));
             end
         end
-        
-    end
+
+    end % End of methods part
     
-end
+end % End of classdef
 
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%
